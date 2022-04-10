@@ -1,8 +1,6 @@
 pragma solidity ^0.8.0;
 
-contract Model {
-    ProductionUnit[] productionUnits;
-    
+interface Model {
     struct ProductionUnit {
         //address Addr;
         uint32 ID;
