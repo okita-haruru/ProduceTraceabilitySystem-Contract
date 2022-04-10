@@ -8,6 +8,8 @@ interface Model {
         uint8 score;
         string name;
         address[] subAddr;
+        uint16 power;
+        uint64 scores;
     }
     struct User {
         //bytes32 ID;

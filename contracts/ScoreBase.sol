@@ -9,7 +9,7 @@ interface ScoreBase {
         uint8 _score
     ) external;
 
-    function updateScore(uint32 _productionUnitID)external;
+    //function updateScore(uint32 _productionUnitID)internal;
 
     function sanction(uint32 _productionUnitID, uint32 _timeStamp) external;
 }
