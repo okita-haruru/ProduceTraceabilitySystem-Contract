@@ -4,7 +4,6 @@ interface ProductBase {
     
     function generateProductID(
         uint32 _productionUnitID,
-        uint32 _timeStamp,
         uint16 _num
     ) external returns (bytes32[] memory IDs);
     // {
@@ -19,7 +18,6 @@ interface ProductBase {
 
     function confirm(
         bytes32 _productionID,
-        uint32 _timeStamp,
         uint32 _productionUnitID,
         uint8 _state
     ) external;

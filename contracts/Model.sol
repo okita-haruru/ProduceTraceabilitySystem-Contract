@@ -2,18 +2,16 @@ pragma solidity ^0.8.0;
 
 interface Model {
     struct ProductionUnit {
-        //address Addr;
         uint32 ID;
         bool banned;
         uint8 score;
         string name;
-        address[] subAddr;
         uint16 power;
         uint64 scores;
     }
     struct User {
         //bytes32 ID;
-        bytes32 password;
+        string password;
         bool banned;
     }
     // struct Product{
