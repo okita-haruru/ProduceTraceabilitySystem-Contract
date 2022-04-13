@@ -1,15 +1,22 @@
 pragma solidity ^0.8.0;
-import "./Model.sol";
+import "./ComplainQueue.sol";
 import "./Event.sol";
 import "./ProductBase.sol";
 import "./ScoreBase.sol";
+import "./Model.sol";
 
-contract ProductTraceabilitySystem is Model, Event, ProductBase, ScoreBase {
+contract ProductTraceabilitySystem is
+    ComplainQueue,
+    Event,
+    ProductBase,
+    ScoreBase
+{
     address admin;
     mapping(address => ProductionUnit) AddrToUnit;
     mapping(uint32 => ProductionUnit) IDToUnit;
     mapping(uint64 => User) IDToUser;
     mapping(uint64 => bool) registered;
+    ComplainQueue complainQueue;
 
     function generateProductID(uint32 _productionUnitID, uint16 _num)
         public
@@ -69,18 +76,17 @@ contract ProductTraceabilitySystem is Model, Event, ProductBase, ScoreBase {
         IDToUnit[_productionUnitID].scores = 0;
         emit Sanction(_productionUnitID, block.timestamp);
     }
-    
-    function unitRecover(uint32 _productionUnitID)public{
+
+    function unitRecover(uint32 _productionUnitID) public {
         require(msg.sender == admin);
         require(IDToUnit[_productionUnitID].banned == true);
         IDToUnit[_productionUnitID].banned = false;
-
     }
 
     function userRegister(uint64 _ID, string calldata _password) public {
         require(registered[_ID] == false);
         registered[_ID] = true;
-        IDToUser[_ID] = User({password: _password, banned: false});
+        IDToUser[_ID] = User({password: _password, banned: false, credit: 3});
     }
 
     function authCheck(uint64 _ID, string calldata _password)
@@ -112,5 +118,39 @@ contract ProductTraceabilitySystem is Model, Event, ProductBase, ScoreBase {
             power: 0,
             scores: 0
         });
+    }
+
+    function complain(
+        uint64 _userID,
+        string calldata _password,
+        uint32 _productionUnitID,
+        string calldata _msg
+    ) public {
+        require(!IDToUser[_userID].banned);
+        require(authCheck(_userID, _password));
+        emit Complaint(_userID, _productionUnitID, block.timestamp, _msg);
+        Complain memory _complain = Complain({
+            userID: _userID,
+            productionUnitID: _productionUnitID,
+            timeStamp: block.timestamp
+        });
+        push(complainQueue, _complain);
+    }
+
+    function getComplains()public view returns(Complain[] memory complains){
+        require(msg.sender == admin);
+        return complainQueue.data;
+    }
+
+    function HandleComplain(uint32 _productionUnitID, bool _result) public {
+        require(msg.sender == admin);
+        require(!IDToUser[getFirst(complainQueue).userID].banned);
+        emit ComplaintHandled(_productionUnitID, block.timestamp, _result);
+        Complain storage _complain = pop(complainQueue);
+        if (!_result) {
+            IDToUser[_complain.userID].credit--;
+        } else {
+            IDToUser[_complain.userID].credit++;
+        }
     }
 }

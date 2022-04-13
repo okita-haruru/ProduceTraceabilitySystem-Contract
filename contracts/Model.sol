@@ -10,16 +10,14 @@ interface Model {
         uint64 scores;
     }
     struct User {
-        //bytes32 ID;
         string password;
         bool banned;
+        uint8 credit;
     }
-    // struct Product{
-    //     bytes32 ID;
-    //     string name;
-    // }
-    // struct Admin{
-    //     address Addr;
-    //     string name;
-    // }
+    struct Complain {
+        uint64 userID;
+        uint32 productionUnitID;
+        uint256 timeStamp;
+    }
+    
 }
