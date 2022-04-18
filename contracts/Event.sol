@@ -31,5 +31,7 @@ interface Event {
         bool result
     );
     event Warn(uint32 indexed productionUnitID, uint256 timeStamp);
+    event WarnHandled(uint32 indexed productionUnitID, uint256 timeStamp);
+
     event Ban(uint64 indexed userID, uint256 timeStamp);
 }
