@@ -10,7 +10,6 @@ interface Model {
         uint64 scores;
     }
     struct User {
-        string password;
         bool banned;
         uint8 credit;
     }
