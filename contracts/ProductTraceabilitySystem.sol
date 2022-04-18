@@ -1,26 +1,22 @@
 pragma solidity ^0.8.0;
 import "./ComplainQueue.sol";
 import "./Event.sol";
-import "./ProductBase.sol";
-import "./ScoreBase.sol";
 import "./Model.sol";
 
 contract ProductTraceabilitySystem is
     ComplainQueue,
-    Event,
-    ProductBase,
-    ScoreBase
+    Event
 {
     address admin;
     mapping(address => ProductionUnit) AddrToUnit;
     mapping(uint32 => ProductionUnit) IDToUnit;
     mapping(uint64 => User) IDToUser;
+    mapping(address=>uint64) addressToID;
     mapping(uint64 => bool) registered;
     ComplainQueue complainQueue;
 
     function generateProductID(uint32 _productionUnitID, uint16 _num)
         public
-        override
         returns (bytes32[] memory IDs)
     {
         //IDs = new uint[](_num);
@@ -36,19 +32,17 @@ contract ProductTraceabilitySystem is
         bytes32 _productionID,
         uint32 _productionUnitID,
         uint8 _state
-    ) public override {
+    ) public {
         require(AddrToUnit[msg.sender].ID == _productionUnitID);
         emit Confirm(_productionID, _productionUnitID, _state, block.timestamp);
     }
 
     function score(
-        uint64 _userID,
-        string calldata _password,
         uint32 _productionUnitID,
         uint8 _score
-    ) public override {
+    ) public  {
+        uint64 _userID=addressToID[msg.sender];
         require(!IDToUser[_userID].banned);
-        require(authCheck(_userID, _password));
         emit Score(_userID, _productionUnitID, block.timestamp, _score);
         IDToUnit[_productionUnitID].scores += _score;
         IDToUnit[_productionUnitID].power++;
@@ -83,29 +77,11 @@ contract ProductTraceabilitySystem is
         IDToUnit[_productionUnitID].banned = false;
     }
 
-    function userRegister(uint64 _ID, string calldata _password) public {
+    function userRegister(uint64 _ID) public {
         require(registered[_ID] == false);
         registered[_ID] = true;
-        IDToUser[_ID] = User({password: _password, banned: false, credit: 3});
-    }
-
-    function authCheck(uint64 _ID, string calldata _password)
-        internal
-        view
-        returns (bool)
-    {
-        require(registered[_ID] == true);
-        string memory rightPass = IDToUser[_ID].password;
-
-        if (bytes(_password).length != bytes(rightPass).length) {
-            return false;
-        }
-        for (uint256 i = 0; i < bytes(_password).length; i++) {
-            if (bytes(_password)[i] != bytes(rightPass)[i]) {
-                return false;
-            }
-        }
-        return true;
+        addressToID[msg.sender]=_ID;
+        IDToUser[_ID] = User({ banned: false, credit: 2});
     }
 
     function unitRegister(uint32 _ID, string calldata _name) public {
@@ -121,16 +97,14 @@ contract ProductTraceabilitySystem is
     }
 
     function complain(
-        uint64 _userID,
         string calldata _password,
         uint32 _productionUnitID,
         string calldata _msg
     ) public {
-        require(!IDToUser[_userID].banned);
-        require(authCheck(_userID, _password));
-        emit Complaint(_userID, _productionUnitID, block.timestamp, _msg);
+        require(!IDToUser[addressToID[msg.sender]].banned);
+        emit Complaint(addressToID[msg.sender], _productionUnitID, block.timestamp, _msg);
         Complain memory _complain = Complain({
-            userID: _userID,
+            userID: addressToID[msg.sender],
             productionUnitID: _productionUnitID,
             timeStamp: block.timestamp
         });
