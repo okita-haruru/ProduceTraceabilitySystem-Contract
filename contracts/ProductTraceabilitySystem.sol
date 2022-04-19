@@ -8,42 +8,52 @@ contract ProductTraceabilitySystem is
     Event
 {
     address admin;
-    mapping(address => ProductionUnit) AddrToUnit;
+    bool closed;
+    mapping(address => uint32) addressToUnitID;
     mapping(uint32 => ProductionUnit) IDToUnit;
     mapping(uint64 => User) IDToUser;
-    mapping(address=>uint64) addressToID;
-    mapping(uint64 => bool) registered;
+    mapping(address=>uint64) addressToUserID;
+    mapping(uint64 => bool) userRegistered;
+    mapping(address =>bool) unitRegistered;
+    mapping(uint32=>uint16) registerCounter;
     ComplainQueue complainQueue;
 
-    function generateProductID(uint32 _productionUnitID, uint16 _num)
+    constructor(){
+        closed=false;
+        admin=msg.sender;
+    }
+
+    function generateProductID(uint16 _num)
         public
         returns (bytes32[] memory IDs)
     {
-        //IDs = new uint[](_num);
+        require(!closed);
+        require(unitRegistered[msg.sender]);
+        require(!IDToUnit[addressToUnitID[msg.sender]].banned);
         for (uint16 i = 0; i < _num; i++) {
             IDs[i] = keccak256(
-                abi.encodePacked(_productionUnitID, block.timestamp, i)
+                abi.encodePacked(addressToUnitID[msg.sender], block.timestamp, i)
             );
-            emit Confirm(IDs[i], _productionUnitID, 0, block.timestamp);
+            emit Confirm(IDs[i],addressToUnitID[msg.sender], 0, block.timestamp);
         }
     }
 
     function confirm(
         bytes32 _productionID,
-        uint32 _productionUnitID,
         uint8 _state
     ) public {
-        require(AddrToUnit[msg.sender].ID == _productionUnitID);
-        emit Confirm(_productionID, _productionUnitID, _state, block.timestamp);
+        require(!closed);
+        require(!IDToUnit[addressToUnitID[msg.sender]].banned);
+        emit Confirm(_productionID, addressToUnitID[msg.sender], _state, block.timestamp);
     }
 
     function score(
         uint32 _productionUnitID,
         uint8 _score
     ) public  {
-        uint64 _userID=addressToID[msg.sender];
-        require(!IDToUser[_userID].banned);
-        emit Score(_userID, _productionUnitID, block.timestamp, _score);
+        require(!closed);
+        require(!IDToUser[addressToUserID[msg.sender]].banned);
+        emit Score(addressToUserID[msg.sender], _productionUnitID, block.timestamp, _score);
         IDToUnit[_productionUnitID].scores += _score;
         IDToUnit[_productionUnitID].power++;
         updateScore(_productionUnitID);
@@ -57,12 +67,14 @@ contract ProductTraceabilitySystem is
     }
 
     function banUser(uint64 _userID) public {
+        require(!closed);
         require(msg.sender == admin);
         IDToUser[_userID].banned = true;
         emit Ban(_userID, block.timestamp);
     }
 
     function sanction(uint32 _productionUnitID) public {
+        require(!closed);
         require(msg.sender == admin);
         IDToUnit[_productionUnitID].banned = true;
         IDToUnit[_productionUnitID].score = 0;
@@ -72,20 +84,25 @@ contract ProductTraceabilitySystem is
     }
 
     function unitRecover(uint32 _productionUnitID) public {
+        require(!closed);
         require(msg.sender == admin);
         require(IDToUnit[_productionUnitID].banned == true);
         IDToUnit[_productionUnitID].banned = false;
     }
 
     function userRegister(uint64 _ID) public {
-        require(registered[_ID] == false);
-        registered[_ID] = true;
-        addressToID[msg.sender]=_ID;
+        require(userRegistered[_ID] == false);
+        userRegistered[_ID] = true;
+        addressToUserID[msg.sender]=_ID;
         IDToUser[_ID] = User({ banned: false, credit: 2});
     }
 
-    function unitRegister(uint32 _ID, string calldata _name) public {
-        require(IDToUnit[_ID].ID == 0);
+    function unitRegister(address _unitAddress,uint32 _addrCode, string calldata _name) public {
+        require(!closed);
+        require(msg.sender==admin);
+        require(!unitRegistered[_unitAddress]);
+        uint32 _ID=getNewUintID(_addrCode);
+        addressToUnitID[_unitAddress]=_ID;
         IDToUnit[_ID] = ProductionUnit({
             ID: _ID,
             name: _name,
@@ -97,14 +114,14 @@ contract ProductTraceabilitySystem is
     }
 
     function complain(
-        string calldata _password,
         uint32 _productionUnitID,
         string calldata _msg
     ) public {
-        require(!IDToUser[addressToID[msg.sender]].banned);
-        emit Complaint(addressToID[msg.sender], _productionUnitID, block.timestamp, _msg);
+        require(!closed);
+        require(!IDToUser[addressToUserID[msg.sender]].banned);
+        emit Complaint(addressToUserID[msg.sender], _productionUnitID, block.timestamp, _msg);
         Complain memory _complain = Complain({
-            userID: addressToID[msg.sender],
+            userID: addressToUserID[msg.sender],
             productionUnitID: _productionUnitID,
             timeStamp: block.timestamp
         });
@@ -112,11 +129,13 @@ contract ProductTraceabilitySystem is
     }
 
     function getComplains()public view returns(Complain[] memory complains){
+        require(!closed);
         require(msg.sender == admin);
         return complainQueue.data;
     }
 
     function HandleComplain(uint32 _productionUnitID, bool _result) public {
+        require(!closed);
         require(msg.sender == admin);
         require(!IDToUser[getFirst(complainQueue).userID].banned);
         emit ComplaintHandled(_productionUnitID, block.timestamp, _result);
@@ -126,5 +145,8 @@ contract ProductTraceabilitySystem is
         } else {
             IDToUser[_complain.userID].credit++;
         }
+    }
+    function getNewUintID(uint32 _addrCode) internal view returns(uint32){
+        return _addrCode<<12+registerCounter[_addrCode++];
     }
 }
