@@ -1,11 +1,8 @@
 pragma solidity ^0.8.0;
-import "./ComplainQueue.sol";
 import "./Event.sol";
 import "./Model.sol";
 
-contract ProductTraceabilitySystem is
-    ComplainQueue,
-    Event
+contract ProductTraceabilitySystem is  Event,Model
 {
     address admin;
     bool closed;
@@ -16,7 +13,6 @@ contract ProductTraceabilitySystem is
     mapping(uint64 => bool) userRegistered;
     mapping(address =>bool) unitRegistered;
     mapping(uint32=>uint16) registerCounter;
-    ComplainQueue complainQueue;
 
     constructor(){
         closed=false;
@@ -52,7 +48,7 @@ contract ProductTraceabilitySystem is
         uint8 _score
     ) public  {
         require(!closed);
-        require(!IDToUser[addressToUserID[msg.sender]].banned);
+        require(IDToUser[addressToUserID[msg.sender]].credit>0);
         emit Score(addressToUserID[msg.sender], _productionUnitID, block.timestamp, _score);
         IDToUnit[_productionUnitID].scores += _score;
         IDToUnit[_productionUnitID].power++;
@@ -69,7 +65,7 @@ contract ProductTraceabilitySystem is
     function banUser(uint64 _userID) public {
         require(!closed);
         require(msg.sender == admin);
-        IDToUser[_userID].banned = true;
+        IDToUser[_userID].credit = 0;
         emit Ban(_userID, block.timestamp);
     }
 
@@ -94,7 +90,7 @@ contract ProductTraceabilitySystem is
         require(userRegistered[_ID] == false);
         userRegistered[_ID] = true;
         addressToUserID[msg.sender]=_ID;
-        IDToUser[_ID] = User({ banned: false, credit: 2});
+        IDToUser[_ID] = User({ ID: _ID, credit: 2});
     }
 
     function unitRegister(address _unitAddress,uint32 _addrCode, string calldata _name) public {
@@ -118,35 +114,39 @@ contract ProductTraceabilitySystem is
         string calldata _msg
     ) public {
         require(!closed);
-        require(!IDToUser[addressToUserID[msg.sender]].banned);
+        require(IDToUser[addressToUserID[msg.sender]].credit>0);
         emit Complaint(addressToUserID[msg.sender], _productionUnitID, block.timestamp, _msg);
-        Complain memory _complain = Complain({
-            userID: addressToUserID[msg.sender],
-            productionUnitID: _productionUnitID,
-            timeStamp: block.timestamp
-        });
-        push(complainQueue, _complain);
     }
 
-    function getComplains()public view returns(Complain[] memory complains){
+    function HandleComplain(uint64 _userID,uint32 _productionUnitID, uint8 _result) public {
         require(!closed);
         require(msg.sender == admin);
-        return complainQueue.data;
-    }
-
-    function HandleComplain(uint32 _productionUnitID, bool _result) public {
-        require(!closed);
-        require(msg.sender == admin);
-        require(!IDToUser[getFirst(complainQueue).userID].banned);
-        emit ComplaintHandled(_productionUnitID, block.timestamp, _result);
-        Complain storage _complain = pop(complainQueue);
-        if (!_result) {
-            IDToUser[_complain.userID].credit--;
-        } else {
-            IDToUser[_complain.userID].credit++;
+        if(_result==1)
+        {
+            return;
+        }
+        if(_result==0)
+        {
+            IDToUnit[_productionUnitID].banned=true;
+            plusCredit(_userID);
+        }else{
+            minusCredit(_userID);
         }
     }
     function getNewUintID(uint32 _addrCode) internal view returns(uint32){
         return _addrCode<<12+registerCounter[_addrCode++];
+    }
+
+    function minusCredit(uint64 _userID) internal{
+        if(IDToUser[_userID].credit>0)
+        {
+            IDToUser[_userID].credit--;
+        }
+    }
+    function plusCredit(uint64 _userID) internal{
+        if(IDToUser[_userID].credit<5)
+        {
+            IDToUser[_userID].credit++;
+        }
     }
 }

@@ -10,7 +10,7 @@ interface Model {
         uint64 scores;
     }
     struct User {
-        bool banned;
+        uint64 ID;
         uint8 credit;
     }
     struct Complain {
