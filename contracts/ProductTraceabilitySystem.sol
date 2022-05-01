@@ -149,4 +149,11 @@ contract ProductTraceabilitySystem is  Event,Model
             IDToUser[_userID].credit++;
         }
     }
+    function getScore(uint32 _unitID) public view returns(uint8){
+        return IDToUnit[_unitID].score;
+    }
+    function getCredit(uint64 _userID) public view returns(uint8){
+        return IDToUser[_userID].credit;
+    }
+
 }
