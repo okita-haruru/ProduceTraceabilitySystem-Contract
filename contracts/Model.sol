@@ -5,12 +5,12 @@ interface Model {
         uint32 ID;
         bool banned;
         uint8 score;
-        string name;
+        bytes32 name;
         uint16 power;
         uint64 scores;
     }
     struct User {
-        uint64 ID;
+        bytes32 ID;
         uint8 credit;
     }
     struct Complain {
@@ -18,5 +18,4 @@ interface Model {
         uint32 productionUnitID;
         uint256 timeStamp;
     }
-    
 }

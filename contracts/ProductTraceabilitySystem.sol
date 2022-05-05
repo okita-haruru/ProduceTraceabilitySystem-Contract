@@ -2,54 +2,64 @@ pragma solidity ^0.8.0;
 import "./Event.sol";
 import "./Model.sol";
 
-contract ProductTraceabilitySystem is  Event,Model
-{
+contract ProductTraceabilitySystem is Event, Model {
     address admin;
     bool closed;
-    mapping(address => uint32) addressToUnitID;
     mapping(uint32 => ProductionUnit) IDToUnit;
-    mapping(uint64 => User) IDToUser;
-    mapping(address=>uint64) addressToUserID;
-    mapping(uint64 => bool) userRegistered;
-    mapping(address =>bool) unitRegistered;
-    mapping(uint32=>uint16) registerCounter;
+    mapping(bytes32 => User) IDToUser;
+    mapping(address => uint32) addressToUnitID;
+    mapping(address => bytes32) addressToUserID;
+    mapping(bytes32 => bool) userRegistered;
+    mapping(address => bool) unitRegistered;
+    mapping(uint32 => uint16) registerCounter;
 
-    constructor(){
-        closed=false;
-        admin=msg.sender;
+    constructor() {
+        closed = false;
+        admin = msg.sender;
     }
 
-    function generateProductID(uint16 _num)
-        public
-        returns (bytes32[] memory IDs)
-    {
+    function generateProductID(uint256 _time) public view returns (bytes32) {
+        //require(!closed);
+        // require(unitRegistered[msg.sender]);
+        // require(!IDToUnit[addressToUnitID[msg.sender]].banned);
+
+        bytes32 ID = keccak256(
+            abi.encodePacked(addressToUnitID[msg.sender], _time)
+        );
+        return ID;
+    }
+
+    function confirm(bytes32 productionID, uint8 _state) public {
         require(!closed);
-        require(unitRegistered[msg.sender]);
         require(!IDToUnit[addressToUnitID[msg.sender]].banned);
-        for (uint16 i = 0; i < _num; i++) {
-            IDs[i] = keccak256(
-                abi.encodePacked(addressToUnitID[msg.sender], block.timestamp, i)
-            );
-            emit Confirm(IDs[i],addressToUnitID[msg.sender], 0, block.timestamp);
+        //bytes32 _byteProductionID = stringToBytes32(_productionID);
+        emit Confirm(
+            productionID,
+            addressToUnitID[msg.sender],
+            _state,
+            block.timestamp
+        );
+    }
+
+    function stringToBytes32(string memory source)
+        internal
+        pure
+        returns (bytes32 result)
+    {
+        assembly {
+            result := mload(add(source, 32))
         }
     }
 
-    function confirm(
-        bytes32 _productionID,
-        uint8 _state
-    ) public {
+    function score(uint32 _productionUnitID, uint8 _score) public {
         require(!closed);
-        require(!IDToUnit[addressToUnitID[msg.sender]].banned);
-        emit Confirm(_productionID, addressToUnitID[msg.sender], _state, block.timestamp);
-    }
-
-    function score(
-        uint32 _productionUnitID,
-        uint8 _score
-    ) public  {
-        require(!closed);
-        require(IDToUser[addressToUserID[msg.sender]].credit>0);
-        emit Score(addressToUserID[msg.sender], _productionUnitID, block.timestamp, _score);
+        require(IDToUser[addressToUserID[msg.sender]].credit > 0);
+        emit Score(
+            addressToUserID[msg.sender],
+            _productionUnitID,
+            block.timestamp,
+            _score
+        );
         IDToUnit[_productionUnitID].scores += _score;
         IDToUnit[_productionUnitID].power++;
         updateScore(_productionUnitID);
@@ -62,7 +72,7 @@ contract ProductTraceabilitySystem is  Event,Model
         );
     }
 
-    function banUser(uint64 _userID) public {
+    function banUser(bytes32 _userID) public {
         require(!closed);
         require(msg.sender == admin);
         IDToUser[_userID].credit = 0;
@@ -86,74 +96,145 @@ contract ProductTraceabilitySystem is  Event,Model
         IDToUnit[_productionUnitID].banned = false;
     }
 
-    function userRegister(uint64 _ID) public {
-        require(userRegistered[_ID] == false);
+    function userRegister(string calldata _userID) public returns (bool) {
+        bytes32 _ID = stringToBytes32(_userID);
+        if (
+            userRegistered[_ID] ||
+            !(IDToUser[addressToUserID[msg.sender]].credit == 0)
+        ) {
+            return false;
+        }
+
         userRegistered[_ID] = true;
-        addressToUserID[msg.sender]=_ID;
-        IDToUser[_ID] = User({ ID: _ID, credit: 2});
+        addressToUserID[msg.sender] = _ID;
+        IDToUser[_ID] = User({ID: _ID, credit: 2});
+        emit UserRegister(msg.sender, block.timestamp);
+        return true;
     }
 
-    function unitRegister(address _unitAddress,uint32 _addrCode, string calldata _name) public {
+    function unitRegister(
+        address _unitAddress,
+        uint32 _addrCode,
+        string calldata _name
+    ) public returns (uint32) {
         require(!closed);
-        require(msg.sender==admin);
+        require(msg.sender == admin);
         require(!unitRegistered[_unitAddress]);
-        uint32 _ID=getNewUintID(_addrCode);
-        addressToUnitID[_unitAddress]=_ID;
+        bytes32 name = stringToBytes32(_name);
+        uint32 _ID = getNewUintID(_addrCode);
+        addressToUnitID[_unitAddress] = _ID;
         IDToUnit[_ID] = ProductionUnit({
             ID: _ID,
-            name: _name,
+            name: name,
             banned: false,
             score: 0,
             power: 0,
             scores: 0
         });
+        return _ID;
     }
 
-    function complain(
+    function complain(uint32 _productionUnitID) public {
+        require(!closed);
+        require(IDToUser[addressToUserID[msg.sender]].credit > 0);
+        emit Complaint(
+            addressToUserID[msg.sender],
+            _productionUnitID,
+            block.timestamp
+        );
+    }
+
+    function HandleComplain(
+        string calldata _userID,
         uint32 _productionUnitID,
-        string calldata _msg
+        uint8 _result
     ) public {
         require(!closed);
-        require(IDToUser[addressToUserID[msg.sender]].credit>0);
-        emit Complaint(addressToUserID[msg.sender], _productionUnitID, block.timestamp, _msg);
-    }
-
-    function HandleComplain(uint64 _userID,uint32 _productionUnitID, uint8 _result) public {
-        require(!closed);
         require(msg.sender == admin);
-        if(_result==1)
-        {
+        if (_result == 1) {
             return;
         }
-        if(_result==0)
-        {
-            IDToUnit[_productionUnitID].banned=true;
+        if (_result == 0) {
+            IDToUnit[_productionUnitID].banned = true;
             plusCredit(_userID);
-        }else{
+        } else {
             minusCredit(_userID);
         }
     }
-    function getNewUintID(uint32 _addrCode) internal view returns(uint32){
-        return _addrCode<<12+registerCounter[_addrCode++];
+
+    function getNewUintID(uint32 _addrCode) internal returns (uint32) {
+        uint32 result = (_addrCode << 12) + registerCounter[_addrCode];
+        registerCounter[_addrCode] += 1;
+        return result;
     }
 
-    function minusCredit(uint64 _userID) internal{
-        if(IDToUser[_userID].credit>0)
-        {
+    function minusCredit(string calldata _ID) internal {
+        bytes32 _userID = stringToBytes32(_ID);
+        if (IDToUser[_userID].credit > 0) {
             IDToUser[_userID].credit--;
         }
     }
-    function plusCredit(uint64 _userID) internal{
-        if(IDToUser[_userID].credit<5)
-        {
+
+    function plusCredit(string calldata _ID) internal {
+        bytes32 _userID = stringToBytes32(_ID);
+        if (IDToUser[_userID].credit < 5) {
             IDToUser[_userID].credit++;
         }
     }
-    function getScore(uint32 _unitID) public view returns(uint8){
+
+    function getScore(uint32 _unitID) public view returns (uint8) {
         return IDToUnit[_unitID].score;
     }
-    function getCredit(uint64 _userID) public view returns(uint8){
+
+    function getCredit(string calldata _ID) public view returns (uint8) {
+        bytes32 _userID = stringToBytes32(_ID);
         return IDToUser[_userID].credit;
     }
 
+    function getUserRegistered(address _address) public view returns (bool) {
+        if (IDToUser[addressToUserID[msg.sender]].credit == 0) {
+            return false;
+        }
+        return true;
+    }
+
+    function getUserID() public view returns (bytes32) {
+        require(!closed);
+        return addressToUserID[msg.sender];
+    }
+
+    function Bytes32ToString(bytes32 b32name)
+        internal
+        pure
+        returns (string memory)
+    {
+        bytes memory bytesString = new bytes(32);
+
+        // 定义一个变量记录字节数量
+        uint256 charCount = 0;
+
+        // 统计共有多少个字节数
+        for (uint32 i = 0; i < 32; i++) {
+            bytes1 char = bytes1(bytes32(uint256(b32name) * 2**(8 * i))); // 将b32name左移i位,参考下面算法
+            // 获取到的始终是第0个字节。
+            // 但为什么*2
+
+            if (char != 0) {
+                bytesString[charCount] = char;
+                charCount++;
+            }
+        }
+
+        // 初始化一动态数组，长度为charCount
+        bytes memory bytesStringTrimmed = new bytes(charCount);
+        for (uint256 i = 0; i < charCount; i++) {
+            bytesStringTrimmed[i] = bytesString[i];
+        }
+
+        return string(bytesStringTrimmed);
+    }
+
+    function getUnitID() public view returns (uint32) {
+        return addressToUnitID[msg.sender];
+    }
 }

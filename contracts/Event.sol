@@ -13,17 +13,16 @@ interface Event {
         uint256 timeStamp
     );
     event Score(
-        uint64 indexed userID,
+        bytes32 indexed userID,
         uint32 indexed productionUnitID,
         uint256 timeStamp,
         uint8 score
     );
     event Sanction(uint32 indexed productionUnitID, uint256 timeStamp);
     event Complaint(
-        uint64 indexed userID,
+        bytes32 indexed userID,
         uint32 indexed productionUnitID,
-        uint256 timeStamp,
-        string msg
+        uint256 timeStamp
     );
     event ComplaintHandled(
         uint32 indexed productionUnitID,
@@ -33,5 +32,6 @@ interface Event {
     event Warn(uint32 indexed productionUnitID, uint256 timeStamp);
     event WarnHandled(uint32 indexed productionUnitID, uint256 timeStamp);
 
-    event Ban(uint64 indexed userID, uint256 timeStamp);
+    event Ban(bytes32 indexed userID, uint256 timeStamp);
+    event UserRegister(address indexed userAddress, uint256 timeStamp);
 }
