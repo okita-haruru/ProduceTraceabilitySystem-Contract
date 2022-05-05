@@ -96,6 +96,13 @@ contract ProductTraceabilitySystem is Event, Model {
         IDToUnit[_productionUnitID].banned = false;
     }
 
+    function userRecover(bytes32 _userID) public {
+        require(!closed);
+        require(msg.sender == admin);
+        require(IDToUser[_userID].credit == 0);
+        plusCredit(_userID);
+    }
+
     function userRegister(string calldata _userID) public returns (bool) {
         bytes32 _ID = stringToBytes32(_userID);
         if (
@@ -146,7 +153,7 @@ contract ProductTraceabilitySystem is Event, Model {
     }
 
     function HandleComplain(
-        string calldata _userID,
+        bytes32 _userID,
         uint32 _productionUnitID,
         uint8 _result
     ) public {
@@ -161,6 +168,7 @@ contract ProductTraceabilitySystem is Event, Model {
         } else {
             minusCredit(_userID);
         }
+        emit ComplaintHandled(_productionUnitID, block.timestamp, _result);
     }
 
     function getNewUintID(uint32 _addrCode) internal returns (uint32) {
@@ -169,17 +177,15 @@ contract ProductTraceabilitySystem is Event, Model {
         return result;
     }
 
-    function minusCredit(string calldata _ID) internal {
-        bytes32 _userID = stringToBytes32(_ID);
-        if (IDToUser[_userID].credit > 0) {
-            IDToUser[_userID].credit--;
+    function minusCredit(bytes32 _ID) internal {
+        if (IDToUser[_ID].credit > 0) {
+            IDToUser[_ID].credit--;
         }
     }
 
-    function plusCredit(string calldata _ID) internal {
-        bytes32 _userID = stringToBytes32(_ID);
-        if (IDToUser[_userID].credit < 5) {
-            IDToUser[_userID].credit++;
+    function plusCredit(bytes32 _ID) internal {
+        if (IDToUser[_ID].credit < 5) {
+            IDToUser[_ID].credit++;
         }
     }
 

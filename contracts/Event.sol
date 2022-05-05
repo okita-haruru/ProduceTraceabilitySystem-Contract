@@ -27,7 +27,7 @@ interface Event {
     event ComplaintHandled(
         uint32 indexed productionUnitID,
         uint256 timeStamp,
-        bool result
+        uint8 result
     );
     event Warn(uint32 indexed productionUnitID, uint256 timeStamp);
     event WarnHandled(uint32 indexed productionUnitID, uint256 timeStamp);
