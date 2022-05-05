@@ -34,4 +34,5 @@ interface Event {
 
     event Ban(bytes32 indexed userID, uint256 timeStamp);
     event UserRegister(address indexed userAddress, uint256 timeStamp);
+    event UnitRegister(uint32 indexed productionUnitID, uint256 timeStamp);
 }

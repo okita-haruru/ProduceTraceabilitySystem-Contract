@@ -132,6 +132,7 @@ contract ProductTraceabilitySystem is Event, Model {
             scores: 0
         });
         return _ID;
+        emit UnitRegister(_ID, block.timestamp);
     }
 
     function complain(uint32 _productionUnitID) public {
