@@ -72,9 +72,10 @@ contract ProductTraceabilitySystem is Event, Model {
         );
     }
 
-    function banUser(bytes32 _userID) public {
+    function banUser(string calldata _ID) public {
         require(!closed);
         require(msg.sender == admin);
+        bytes32 _userID = stringToBytes32(_ID);
         IDToUser[_userID].credit = 0;
         emit Ban(_userID, block.timestamp);
     }
@@ -96,9 +97,10 @@ contract ProductTraceabilitySystem is Event, Model {
         IDToUnit[_productionUnitID].banned = false;
     }
 
-    function userRecover(bytes32 _userID) public {
+    function userRecover(string calldata _ID) public {
         require(!closed);
         require(msg.sender == admin);
+        bytes32 _userID = stringToBytes32(_ID);
         require(IDToUser[_userID].credit == 0);
         plusCredit(_userID);
     }
@@ -153,12 +155,13 @@ contract ProductTraceabilitySystem is Event, Model {
     }
 
     function HandleComplain(
-        bytes32 _userID,
+        string calldata _ID,
         uint32 _productionUnitID,
         uint8 _result
     ) public {
         require(!closed);
         require(msg.sender == admin);
+        bytes32 _userID = stringToBytes32(_ID);
         if (_result == 1) {
             return;
         }
@@ -193,9 +196,10 @@ contract ProductTraceabilitySystem is Event, Model {
         return IDToUnit[_unitID].score;
     }
 
-    function getCredit(string calldata _ID) public view returns (uint8) {
-        bytes32 _userID = stringToBytes32(_ID);
-        return IDToUser[_userID].credit;
+    function getCredit() public view returns (uint8) {
+        //bytes32 _userID = stringToBytes32(_ID);
+        // bytes32 _userID = stringToBytes32(_ID);
+        return IDToUser[addressToUserID[msg.sender]].credit;
     }
 
     function getUserRegistered(address _address) public view returns (bool) {
@@ -222,9 +226,7 @@ contract ProductTraceabilitySystem is Event, Model {
 
         // 统计共有多少个字节数
         for (uint32 i = 0; i < 32; i++) {
-            bytes1 char = bytes1(bytes32(uint256(b32name) * 2**(8 * i))); // 将b32name左移i位,参考下面算法
-            // 获取到的始终是第0个字节。
-            // 但为什么*2
+            bytes1 char = bytes1(bytes32(uint256(b32name) * 2**(8 * i)));
 
             if (char != 0) {
                 bytesString[charCount] = char;
